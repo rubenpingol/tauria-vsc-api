@@ -1,3 +1,3 @@
 export default {
-  jwtSecret: "${|2L!|33i7}"
+  jwtSecret: "${$3<|23T}"
 }

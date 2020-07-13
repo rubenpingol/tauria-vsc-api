@@ -4,7 +4,7 @@ import { validate } from "class-validator";
 
 import { Room } from "../entity/Room";
 import { User } from "../entity/User";
-import { ICreateRoom } from "../types/room";
+import { ICreateRoom, IChangeHost } from "../types/room";
 
 class RoomController {
   /**
@@ -50,7 +50,15 @@ class RoomController {
       res.status(400).send({error});
     }
 
-    res.status(201).send(room);
+    const roomData = await getRepository(Room)
+      .createQueryBuilder("room")
+      .where("room.id = :roomId", { roomId: room.id })
+      .leftJoin("room.host", "host")
+      .leftJoin("room.participants", "participant")
+      .select(["room", "host.id", "host.username", "participant.id", "participant.username"])
+      .getOne();
+
+    res.status(201).send(roomData);
   };
 
   /**
@@ -211,19 +219,19 @@ class RoomController {
    * */
   static changeHost = async (req: Request, res: Response) => {
     const guid = <string>req.params.guid;
-    const { userId } = <{ userId: number }>req.body;
-    const currentUserID = <number>res.locals.jwtPayload.userId;
+    const { user_id } = <IChangeHost>req.body;
+    const currentUserId = <number>res.locals.jwtPayload.userId;
     const roomRepo = getRepository(Room);
     let room: Room;
 
     // return false, if no user selected
-    if (!userId) {
+    if (!user_id) {
       res.status(400).send({ error: { message: "Action not permitted. Please select user as the new host" } });
       return;
     }
 
     // return false, if current user and new host (user) is the same
-    if (userId === currentUserID) {
+    if (user_id === currentUserId) {
       res.status(400).send({ error: { message: "No changes made as you're still the host of this room" } });
       return;
     }
@@ -238,7 +246,7 @@ class RoomController {
     }
 
     // return false, if current user is not the host of the selected room
-    if (room.host.id !== currentUserID) {
+    if (room.host.id !== currentUserId) {
       res.status(400).send({ error: { message: "Action not permitted. You\'re not the host of this room" } });
       return;
     }
@@ -248,7 +256,7 @@ class RoomController {
     let newHost: User;
 
     try {
-      newHost = await userRepo.findOneOrFail(userId);
+      newHost = await userRepo.findOneOrFail(user_id);
     } catch (error) {
       res.status(400).send({ error: { message: "Action not permitted. Can\'t find specified user as the new host" } });
     }
@@ -256,8 +264,8 @@ class RoomController {
     room.host = newHost;
 
     // add old host as participant
-    if (!room.participants.filter(participant => participant.id === currentUserID).length) {
-      const oldHostToParticipant = await userRepo.findOneOrFail(currentUserID);
+    if (!room.participants.filter(participant => participant.id === currentUserId).length) {
+      const oldHostToParticipant = await userRepo.findOneOrFail(currentUserId);
       room.participants = [...room.participants, oldHostToParticipant];
     }
 

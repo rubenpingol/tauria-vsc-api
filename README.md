@@ -30,7 +30,7 @@ Design a server that handles HTTP requests based on the following specifications
     - Get info (no auth): given a room guid, gest information about a room
     - Search for the rooms that a user is in: given an username, returns a list of rooms that the user is in.
 
-NOTES:
+**NOTES:**
 
 - Express + TypeScript is preferred, but feel free to implement in a framework you're familiar with as well
 - This spec is not comprehensive. Feel free to add any custom behaviour (or assumptions about user input) if they are not specified in the spec. But please do document these behaviours.
@@ -42,3 +42,153 @@ NOTES:
 2. Setup database settings inside `ormconfig.json` file
 3. Run `npm start` command
 4. Run `npm run migration:run` command (optional). This will create initial user with credentials **`admin / admin`**
+
+## Endpoints
+
+### User Management
+
+#### `GET` Get users
+```
+/users
+```
+Request body
+
+> ```
+> None
+> ```
+
+Response body `Success - 200 (OK)`
+
+> ```
+> [
+>   {
+>     "id": 1",
+>     "username": "johndoe",
+>     "mobile_token": null
+>   }
+>   ...
+> ]
+> ```
+
+#### `GET` Get user
+```
+/users/:username
+```
+
+Parameters
+
+> `username` (string)
+
+Response body `Success - 200 (OK)`
+
+> ```
+> {
+>    "id": 1,
+>    "username": "admin",
+>    "mobile_token": null,
+>    "hosted_rooms": [
+>        {
+>            "id": 1,
+>            "guid": "c02a64da-2d86-4bda-85d9-f6b1dfd18daa",
+>            "name": "Backend API Devs",
+>            "capacity": 4
+>        }
+>    ],
+>    "joined_rooms": [
+>        {
+>            "id": 1,
+>            "guid": "c02a64da-2d86-4bda-85d9-f6b1dfd18daa",
+>            "name": "Backend API Devs",
+>            "capacity": 4
+>        }
+>    ]
+> }
+> ```
+
+#### `POST` Register user and authenticate
+```
+/users
+```
+
+Request body
+
+> ```
+> {
+>   "username": "johndoe",
+>   "password": "password",
+>   "mobile_token": null (optional)
+> }
+> ```
+
+Response body `Success - 201 (OK)`
+
+> ```
+> {
+>   "token": "some generated token using JWT",
+>   "username": "johndoe",
+>   "message": "User created and authenticated"
+> }
+> ```
+
+#### `POST` Sign in / authenticate
+```
+/auth/login
+```
+
+Request body
+
+> ```
+> {
+>   "username": "johndoe",
+>   "password": "password"
+> }
+> ```
+
+Response body `Success - 200 (OK)`
+
+> ```
+> {
+>   "token": "some generated token using JWT"
+>   "username": "johndoe"
+> }
+> ```
+
+#### `PATCH` Update user (password and/or mobile_token)
+```
+/users
+```
+
+Request body
+
+> ```
+> {
+>   "old_password": "oldPassword",
+>   "new_password": "newPassword",
+>   "mobile_token": null (optional)
+> }
+> ```
+
+Response body `Success - 201 (OK)`
+
+> ```
+> {
+>   "message": "Successfully updated info"
+> }
+> ```
+
+#### `DELETE` Delete a user (authenticated user itself)
+```
+/users
+```
+
+Request body
+
+> ```
+> None
+> ```
+
+Response body `Success - 204 (No content)
+
+> ```
+> None
+> ```

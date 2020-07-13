@@ -389,12 +389,12 @@ Response body `Success - 200 (OK)`
 >    "capacity": 4,
 >    "host": {
 >        "id": 1,
->        "username": "admin"
+>        "username": "johndoe"
 >    },
 >    "participants": [
 >        {
 >            "id": 1,
->            "username": "admin"
+>            "username": "johndoe"
 >        }
 >    ]
 > }

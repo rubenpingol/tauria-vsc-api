@@ -120,7 +120,7 @@ Request body
 > }
 > ```
 
-Response body `Success - 201 (OK)`
+Response body `Success - 201 (Created)`
 
 > ```
 > {
@@ -168,7 +168,7 @@ Request body
 > }
 > ```
 
-Response body `Success - 201 (OK)`
+Response body `Success - 201 (Updated)`
 
 > ```
 > {
@@ -187,8 +187,214 @@ Request body
 > None
 > ```
 
-Response body `Success - 204 (No content)
+Response body `Success - 204 (No content)`
 
 > ```
 > None
+> ```
+
+### Room Management
+
+#### `POST` Create room
+```
+/rooms
+```
+
+Request header
+
+`Authorization: {token}`, replace `{token}` with the token you get from authentication/sign in.
+
+> ```
+> Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjQsInVzZXJuYW1lIjoiam9obmRvZSIsImlhdCI6MTU5NDY0MTgwMCwiZXhwIjoxNTk0NjQ1NDAwfQ.S8jyG3FWKOYrbdsSEtdzA5L7_dzaY7gaFccSVMNENAE
+> ```
+
+Request body
+
+> ```
+> {
+>   "name": "Frontend Devs",
+>   "capacity": 8, // (optional), default: 5
+> }
+> ```
+
+Response body `Success - 201 (Created)`
+
+> ```
+> {
+>    "id": 1,
+>    "guid": "4060c1f4-db4d-4220-89a1-02cbe4c73285",
+>    "name": "React Devs",
+>    "capacity": 5,
+>    "host": {
+>        "id": 1,
+>        "username": "johndoe"
+>    },
+>    "participants": [
+>        {
+>            "id": 1,
+>            "username": "johndoe"
+>        }
+>    ]
+> }
+> ```
+
+#### `POST` Change host
+```
+/rooms/:guid/change-host
+```
+
+Params
+
+> `guid` (string)
+
+Request header
+
+`Authorization: {token}`, replace `{token}` with the token you get from authentication/sign in.
+
+> ```
+> Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjQsInVzZXJuYW1lIjoiam9obmRvZSIsImlhdCI6MTU5NDY0MTgwMCwiZXhwIjoxNTk0NjQ1NDAwfQ.S8jyG3FWKOYrbdsSEtdzA5L7_dzaY7gaFccSVMNENAE
+> ```
+
+Request body
+
+> ```
+> {
+>   "user_id": 2
+> }
+> ```
+
+Response body `Success - 200 (OK)`
+
+> ```
+> {
+>   "message": "Successfully changed the host of this room"
+> }
+> ```
+
+#### `POST` Join room
+```
+/rooms/:guid/join
+```
+
+Params
+
+> `guid` (string)
+
+Request header
+
+`Authorization: {token}`, replace `{token}` with the token you get from authentication/sign in.
+
+> ```
+> Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjQsInVzZXJuYW1lIjoiam9obmRvZSIsImlhdCI6MTU5NDY0MTgwMCwiZXhwIjoxNTk0NjQ1NDAwfQ.S8jyG3FWKOYrbdsSEtdzA5L7_dzaY7gaFccSVMNENAE
+> ```
+
+Request body
+
+> ```
+> None
+> ```
+
+Response body `Success - 200 (OK)`
+
+> ```
+> {
+>   "message": "Successfully joined the room"
+> }
+> ```
+
+#### `POST` Leave room
+```
+/rooms/:guid/leave
+```
+
+Params
+
+> `guid` (string)
+
+Request header
+
+`Authorization: {token}`, replace `{token}` with the token you get from authentication/sign in.
+
+> ```
+> Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjQsInVzZXJuYW1lIjoiam9obmRvZSIsImlhdCI6MTU5NDY0MTgwMCwiZXhwIjoxNTk0NjQ1NDAwfQ.S8jyG3FWKOYrbdsSEtdzA5L7_dzaY7gaFccSVMNENAE
+> ```
+
+Request body
+
+> ```
+> None
+> ```
+
+Response body `Success - 200 (OK)`
+
+> ```
+> {
+>   "message": "Successfully left the room"
+> }
+> ```
+
+
+#### `GET` Get room
+```
+/rooms/:guid
+```
+
+Params
+
+> `guid` (string)
+
+Request body
+
+> ```
+> None
+> ```
+
+Response body `Success - 200 (OK)`
+
+> ```
+> {
+>   "id": 1,
+>    "guid": "c02a64da-2d86-4bda-85d9-f6b1dfd18daa",
+>    "name": "Backend API Devs",
+>    "capacity": 4,
+>    "host": {
+>        "id": 1,
+>        "username": "admin"
+>    },
+>    "participants": [
+>        {
+>            "id": 1,
+>            "username": "admin"
+>        }
+>    ]
+> }
+> ```
+
+
+#### `GET` List rooms where user is in
+```
+/rooms/user/:username
+```
+
+Params
+
+> `username` (string)
+
+Request body
+
+> ```
+> None
+> ```
+
+Response body `Success - 200 (OK)`
+
+> ```
+> [
+>    {
+>        "id": 1,
+>        "guid": "c02a64da-2d86-4bda-85d9-f6b1dfd18daa",
+>        "name": "Backend API Devs",
+>        "capacity": 4
+>    }
+> ]
 > ```

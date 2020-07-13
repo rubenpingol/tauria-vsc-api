@@ -29,6 +29,14 @@ Design a server that handles HTTP requests based on the following specifications
     - Join/leave (signed in as a user): joins/leaves the room as the current user
     - Get info (no auth): given a room guid, gest information about a room
     - Search for the rooms that a user is in: given an username, returns a list of rooms that the user is in.
+- **Additional assumption/s:**
+    - Change host:
+        - You cannot change host of a room if you're not the host
+    - Leave room:
+        - Cannot leave room if you are the host, unless you change the host of the room first
+        - After changing the host as host, you can now leave the room
+    - Join/leave room:
+        - You must have selected a room to join or leave
 
 **NOTES:**
 
@@ -36,12 +44,18 @@ Design a server that handles HTTP requests based on the following specifications
 - This spec is not comprehensive. Feel free to add any custom behaviour (or assumptions about user input) if they are not specified in the spec. But please do document these behaviours.
 - The server DOES NOT need to persist anything between runs. You can store everything in memory if you want (bonus points for persistence of the data)
 
+## Tools and/or Requirements
+
+- **Postman** - used for testing the API endpoints
+- **SQLite** - used for data storage, to persist data
+
 ## Steps to run this project locally
 
 1. Run `npm i` or `npm install` command
 2. Setup database settings inside `ormconfig.json` file
 3. Run `npm start` command
 4. Run `npm run migration:run` command (optional). This will create initial user with credentials **`admin / admin`**
+5. The server is now running on `localhost:3000`
 
 ## Endpoints
 
@@ -153,10 +167,18 @@ Response body `Success - 200 (OK)`
 > }
 > ```
 
-#### `PATCH` Update user (password and/or mobile_token)
+#### `PATCH` Update user (password and/or mobile_token), requires authentication
 ```
 /users
 ```
+
+Request header
+
+`Authorization: {token}`, replace `{token}` with the token you get from authentication/sign in.
+
+> ```
+> Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjQsInVzZXJuYW1lIjoiam9obmRvZSIsImlhdCI6MTU5NDY0MTgwMCwiZXhwIjoxNTk0NjQ1NDAwfQ.S8jyG3FWKOYrbdsSEtdzA5L7_dzaY7gaFccSVMNENAE
+> ```
 
 Request body
 
@@ -176,10 +198,18 @@ Response body `Success - 201 (Updated)`
 > }
 > ```
 
-#### `DELETE` Delete a user (authenticated user itself)
+#### `DELETE` Delete a user (authenticated user itself), requires authentication
 ```
 /users
 ```
+
+Request header
+
+`Authorization: {token}`, replace `{token}` with the token you get from authentication/sign in.
+
+> ```
+> Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjQsInVzZXJuYW1lIjoiam9obmRvZSIsImlhdCI6MTU5NDY0MTgwMCwiZXhwIjoxNTk0NjQ1NDAwfQ.S8jyG3FWKOYrbdsSEtdzA5L7_dzaY7gaFccSVMNENAE
+> ```
 
 Request body
 

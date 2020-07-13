@@ -4,149 +4,166 @@ import { validate } from "class-validator";
 
 import { User } from "../entity/User";
 import { generateToken } from "../shared/util";
+import { IUpdateUser, INewUser } from "../types/user";
 
 class UserController {
 
-static listAll = async (req: Request, res: Response) => {
-  // get users from database
-  const userRepository = getRepository(User);
-  const users = await userRepository.find({
-    select: ["id", "username", "role"] //We dont want to send the passwords on response
-  });
-
-  //Send the users object
-  res.send(users);
-};
-
-static getOneById = async (req: Request, res: Response) => {
-  // get the ID from the url
-  const id: number = parseInt(req.params.id);
-
-  // get the user from database
-  const userRepository = getRepository(User);
-  try {
-    const user = await userRepository.findOneOrFail(id, {
-      select: ["id", "username", "role"] //We dont want to send the password on response
+  /**
+   * List all users from database without authentication
+   * */
+  static getUsers = async (req: Request, res: Response) => {
+    // get users from database
+    const userRepository = getRepository(User);
+    const users = await userRepository.find({
+      select: ["id", "username", "mobile_token"], // we dont want to send the passwords on response
+      relations: ["hosted_rooms", "joined_rooms"],
     });
-    res.status(200).json(user);
-  } catch (error) {
-    res.status(404).send("User not found");
-  }
-};
 
-static getOneByUsername = async (req: Request, res: Response) => {
-  // get username from the URL
-  const username: string = req.params.username;
+    // send the users object
+    res.send(users);
+  };
 
-  // get the user from DB
-  const userRepository = getRepository(User);
-  try {
-    const user = await userRepository.findOneOrFail(
-      { username: username },
-      {
-        select: ["id", "username"],
-        relations: ["hostedRooms", "joinedRooms"],
-      }
-    );
-    res.json(user);
-  } catch (error) {
-    res.status(404).json({ message: "User not found" });
-  }
-};
+  /**
+   * Gets a user given a username
+   * @param username string
+   * */
+  static getOneByUsername = async (req: Request, res: Response) => {
+    // get username from the URL
+    const username = <string>req.params.username;
 
-static newUser = async (req: Request, res: Response) => {
-  // get parameters from the body
-  let { username, password, role } = req.body;
-  let user = new User();
-  user.username = username;
-  user.password = password;
-  user.role = role;
+    // get the user from DB
+    const userRepository = getRepository(User);
+    try {
+      const user = await userRepository.findOneOrFail(
+        { username: username },
+        {
+          select: ["id", "username", "mobile_token"],
+          relations: ["hosted_rooms", "joined_rooms"],
+        }
+      );
+      res.send(user);
+    } catch (error) {
+      res.status(404).send({ error: {...error, message: "User not found" } });
+    }
+  };
 
-  // validade if the parameters are ok
-  const errors = await validate(user);
-  if (errors.length > 0) {
-    res.status(400).send(errors);
-    return;
-  }
+  /**
+   * Creates a new user and authenticate afterwards
+   * @param username string
+   * @param password string
+   * @param mobile_token string (optional)
+   * */
+  static newUser = async (req: Request, res: Response) => {
+    // get parameters from the body
+    let { username, password, mobile_token } = <INewUser>req.body;
+    let user = new User();
+    user.username = username;
+    user.password = password;
+    user.mobile_token = mobile_token;
 
-  // hash the password, to securely store on DB
-  user.hashPassword();
+    // validade values of model
+    const errors = await validate(user);
+    if (errors.length > 0) {
+      res.status(400).send(errors);
+      return;
+    }
 
-  // try to save. If fails, the username is already in use
-  const userRepository = getRepository(User);
-  try {
-    user = await userRepository.save(user);
-  } catch (e) {
-    res.status(409).send("Username already in use");
-    return;
-  }
+    // hash the password, to securely store on DB
+    user.hashPassword();
 
-  // authenticate newly created user
-  const token = generateToken({ userId: user.id, username: user.username });
+    // try to save. If fails, the username is already in use
+    const userRepository = getRepository(User);
+    try {
+      user = await userRepository.save(user);
+    } catch (error) {
+      res.status(409).json({ error: { name: "UserExists", message: "Username already in use" } });
+      return;
+    }
 
-  // if all ok, send 201 response
-  res.status(201).json({
-    token,
-    username: user.username,
-    message: "User created and authenticated"
-  });
-};
+    // authenticate newly created user
+    const token = generateToken({ userId: user.id, username: user.username });
 
-static editUser = async (req: Request, res: Response) => {
-  // get the ID from the URL
-  const id = req.params.id;
+    // if all ok, send 201 response
+    res.status(201).json({
+      token,
+      username: user.username,
+      message: "User created and authenticated"
+    });
+  };
 
-  // get values from the body
-  const { username, role } = req.body;
+  /**
+   * Updates user info, specifically password and/or mobile_token
+   * @param old_password string
+   * @param new_password string
+   * @param mobile_token string (optional)
+   * */
+  static updateUser = async (req: Request, res: Response) => {
+    const { old_password, new_password, mobile_token } = <IUpdateUser>req.body;
+    const userRepo = getRepository(User);
+    let user: User;
 
-  // try to find user on database
-  const userRepository = getRepository(User);
-  let user;
-  try {
-    user = await userRepository.findOneOrFail(id);
-  } catch (error) {
-    // if not found, send a 404 response
-    res.status(404).send("User not found");
-    return;
-  }
+    // validate if old_password and new_password is set
+    if (!(old_password && new_password)) {
+      res.status(400).json({ message: "Please provide old password and/or new password to continue" });
+      return;
+    }
 
-  // validate the new values on model
-  user.username = username;
-  user.role = role;
-  const errors = await validate(user);
-  if (errors.length > 0) {
-    res.status(400).send(errors);
-    return;
-  }
+    // get current authenticated user ID
+    const currentUserId = res.locals.jwtPayload.userId;
+    try {
+      user = await userRepo.findOneOrFail(currentUserId);
+    } catch (error) {
+      res.status(404).json({error});
+    }
 
-  // try to safe, if fails, that means username already in use
-  try {
-    await userRepository.save(user);
-  } catch (e) {
-    res.status(409).send("Username already in use");
-    return;
-  }
-  // after all send a 204 (no content, but accepted) response
-  res.status(204).send();
-};
+    // return false, if given old password don't match
+    if (!user.checkIfUnencryptedPasswordIsValid(old_password)) {
+      res.status(401).json({ message: "Old password is not valid" });
+      return;
+    }
 
-static deleteUser = async (req: Request, res: Response) => {
-  // get the ID from the url
-  const id = req.params.id;
+    // set new values of model
+    user.mobile_token = mobile_token;
+    user.password = new_password;
 
-  const userRepository = getRepository(User);
-  let user: User;
-  try {
-    user = await userRepository.findOneOrFail(id);
-  } catch (error) {
-    res.status(404).send("User not found");
-  }
+    // validate new values of the model
+    const errors = await validate(user);
+    if (errors.length > 0) {
+      res.status(400).send(errors);
+      return;
+    }
 
-  userRepository.delete(id);
+    // hash the new password and save
+    user.hashPassword();
 
-  // after all send a 204 (no content, but accepted) response
-  res.status(204).send();
-};
+    try {
+      await userRepo.save(user);
+      res.status(201).json({ message: "Successfully updated info" });
+    } catch (error) {
+      res.status(400).json({error});
+    }
+  };
+
+  /**
+   * Deletes a user permanently, must be the authenticated user itself
+   * */
+  static deleteUser = async (req: Request, res: Response) => {
+    // get the ID of current authenticated user
+    const currentUserId = res.locals.jwtPayload.userId;
+    const userRepository = getRepository(User);
+    let user: User;
+
+    try {
+      user = await userRepository.findOneOrFail(currentUserId);
+    } catch (error) {
+      res.status(404).send({ error: {...error, message: "User not found" } });
+    }
+
+    userRepository.delete(currentUserId);
+
+    // after all send a 204 (no content, but accepted) response
+    res.status(204).send();
+  };
 };
 
 export default UserController;

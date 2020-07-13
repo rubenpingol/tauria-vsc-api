@@ -1,12 +1,19 @@
 import { Request, Response } from "express";
 import { getRepository } from "typeorm";
 import { validate } from "class-validator";
+
 import { Room } from "../entity/Room";
 import { User } from "../entity/User";
+import { ICreateRoom } from "../types/room";
 
 class RoomController {
+  /**
+   * Create room as authenticated user and set as host
+   * @param name     string      Room name
+   * @param capacity number || 5 Room participants max capacity
+   * */
   static createRoom = async (req: Request, res: Response) => {
-    const { name, capacity } = req.body;
+    const { name, capacity } = <ICreateRoom>req.body;
     let room = new Room();
     room.name = name;
 
@@ -15,19 +22,24 @@ class RoomController {
     }
 
     // get authenticated user ID as host
-    const host = res.locals.jwtPayload.userId;
-    if (host) {
-      room.host = host;
-      // auto-join host to newly created room
+    const hostId = res.locals.jwtPayload.userId;
+    let hostAsParticipant: User;
+
+    try {
       const userRepo = getRepository(User);
-      const hostAsParticipant = await userRepo.findOneOrFail(host);
-      room.participants = [hostAsParticipant];
+      hostAsParticipant = await userRepo.findOneOrFail(hostId);
+    } catch (error) {
+      res.send({error});
     }
 
-    // validate if the parameters is ok
+    room.host = hostAsParticipant;
+    // auto-join host to newly created room
+    room.participants = [hostAsParticipant];
+
+    // validate values of model
     const errors = await validate(room);
     if (errors.length > 0) {
-      res.status(400).json({ errors });
+      res.status(400).send(errors);
       return;
     }
 
@@ -35,43 +47,57 @@ class RoomController {
     try {
       await roomRepo.save(room);
     } catch (error) {
-      res.status(400).json({ errors: error });
+      res.status(400).send({error});
     }
 
-    res.json({ room });
+    res.status(201).send(room);
   };
 
-  static getAll = async (req: Request, res: Response) => {
+  /**
+   * List all rooms
+   * */
+  static getRooms = async (req: Request, res: Response) => {
     // get rooms from DB
-    const roomRepo = getRepository(Room);
-    const rooms = await roomRepo.find({
-      select: ["id", "guid", "name", "capacity", "host"],
-      relations: ["participants", "host"],
-    });
+    const rooms = await getRepository(Room)
+      .createQueryBuilder("room")
+      .leftJoin("room.host", "host")
+      .leftJoin("room.participants", "participant")
+      .select(["room", "host.id", "host.username", "participant.id", "participant.username"])
+      .getMany();
 
-    res.json(rooms);
+    res.send(rooms);
   };
 
+  /**
+   * Get a room's information given a guid
+   * @param guid string
+   * */
   static getByGuid = async (req: Request, res: Response) => {
     const guid = <string>req.params.guid;
-    const roomRepo = getRepository(Room);
+    let room: Room;
+
     try {
-      const room = await getRepository(Room)
+      room = await getRepository(Room)
         .createQueryBuilder("room")
         .where("room.guid = :guid", { guid: guid })
         .leftJoin("room.host", "host")
         .leftJoin("room.participants", "participant")
         .select(["room", "host.id", "host.username", "participant.id", "participant.username"])
         .getOne();
-        
-      res.json(room);
     } catch (error) {
-      res.status(404).json({ errors: { message: "Room not found", error } });
+      res.status(404).send({ error: {...error, message: "Room not found" } });
     }
+
+    if (!room) {
+      res.status(404).send({ error: { message: "Room not found" } });
+      return;
+    }
+
+    res.send(room);
   };
 
   /**
-   * @description Lets an authenticated user join a selected room
+   * Lets an authenticated user join a selected room
    * @param guid string
    * */
   static joinRoom = async (req: Request, res: Response) => {
@@ -86,21 +112,21 @@ class RoomController {
         { relations: ["host", "participants"] }
       );
     } catch (error) {
-      res.status(404).json({ errors: { message: "Room not found", error } });
+      res.status(404).send({error});
     }
 
     // return false, if room capacity is already reached
     const totalUsersInRoom = room.participants.length; // includes the host
     if (room.capacity === totalUsersInRoom) {
-      res.status(400).json({
-        message: "Cannot join, room is already full. Please check with the host."
+      res.status(400).send({
+        error: { message: "Cannot join, room is already full. Please check with the host." }
       });
       return;
     }
 
     // return false, if user joined the room already
     if (room.participants.filter(participant => participant.id === currentUserID).length) {
-      res.status(400).json({ message: "Action not permitted. You\'re in the room already" });
+      res.status(400).send({ error: { message: "Action not permitted. You\'re in the room already" } });
       return;
     }
 
@@ -120,14 +146,14 @@ class RoomController {
     try {
       await roomRepo.save(room);
 
-      res.json({ message: "Successfully joined the room" });
+      res.send({ message: "Successfully joined the room" });
     } catch (error) {
       res.status(400).json({ error });
     }
   };
 
   /**
-   * @description Let's an authenticated user leave a room
+   * Let's an authenticated user leave a room
    * @param guid string
    * */
   static leaveRoom = async (req: Request, res: Response) => {
@@ -142,18 +168,22 @@ class RoomController {
         { relations: ["host", "participants"] }
       );
     } catch (error) {
-      res.status(404).json({ errors: { message: "Room not found", error } });
+      res.status(404).send({error});
     }
 
     // return false, if current user is the host of the selected room
     if (room.host.id === currentUserID) {
-      res.status(400).json({ message: "Action not permitted. You\'re the host of this room. Please select a participant as new host for you to leave the room" });
+      res.status(400).send({
+        error: {
+          message: "Action not permitted. You\'re the host of this room. Please select a participant as new host for you to leave the room"
+        }
+      });
       return;
     }
 
     // return false, if current user is not a participant of the selected room
     if (!room.participants.filter(participant => participant.id === currentUserID).length) {
-      res.status(400).json({ message: "Action not permitted. You\'re not a participant of this room." });
+      res.status(400).send({ error: { message: "Action not permitted. You\'re not a participant of this room." } });
       return;
     }
 
@@ -161,21 +191,21 @@ class RoomController {
 
     const errors = await validate(room);
     if (errors.length > 0) {
-      res.status(400).json({ errors });
+      res.status(400).send({errors});
       return;
     }
 
     try {
       await roomRepo.save(room);
 
-      res.json({ message: "Successfully left the room." });
+      res.send({ message: "Successfully left the room." });
     } catch (error) {
-      res.status(400).json({ error });
+      res.status(400).send({error});
     }
   };
 
   /**
-   * @description Let's the authenticated user (host), change room host to other user
+   * Let's the authenticated user (host), change room host to other user
    * @param guid string
    * @param userID integer From request.body
    * */
@@ -188,13 +218,13 @@ class RoomController {
 
     // return false, if no user selected
     if (!userId) {
-      res.status(400).json({ message: "Action not permitted. Please select user as the new host" });
+      res.status(400).send({ error: { message: "Action not permitted. Please select user as the new host" } });
       return;
     }
 
     // return false, if current user and new host (user) is the same
     if (userId === currentUserID) {
-      res.status(400).json({ message: "No changes made as you're still the host of this room" });
+      res.status(400).send({ error: { message: "No changes made as you're still the host of this room" } });
       return;
     }
 
@@ -204,12 +234,12 @@ class RoomController {
         { relations: ["host", "participants"] }
       );
     } catch (error) {
-      res.status(404).json({ errors: { message: "Room not found", error } });
+      res.status(404).send({error});
     }
 
     // return false, if current user is not the host of the selected room
     if (room.host.id !== currentUserID) {
-      res.status(400).json({ message: "Action not permitted. You\'re not the host of this room" });
+      res.status(400).send({ error: { message: "Action not permitted. You\'re not the host of this room" } });
       return;
     }
 
@@ -220,7 +250,7 @@ class RoomController {
     try {
       newHost = await userRepo.findOneOrFail(userId);
     } catch (error) {
-      res.status(400).json({ message: "Action not permitted. Can\'t find specified user as the new host" });
+      res.status(400).send({ error: { message: "Action not permitted. Can\'t find specified user as the new host" } });
     }
 
     room.host = newHost;
@@ -234,15 +264,14 @@ class RoomController {
     try {
       await roomRepo.save(room);
 
-      res.json({ message: "Successfully changed the host of this room. "});
+      res.send({ message: "Successfully changed the host of this room." });
     } catch (error) {
-      res.status(400).json({ error, message: "Can\'t change host." });
+      res.status(400).send({ error: {...error, message: "Can\'t change host." } });
     }
-
   };
 
   /**
-   * @description Search for rooms where a given user is in
+   * Search for rooms where a given user is in
    * @param username string
    * */
   static searchUserRooms = async (req: Request, res: Response) => {
@@ -251,14 +280,14 @@ class RoomController {
     try {
       const user = await userRepo.findOneOrFail(
         { username: username },
-        { select: ["id", "username"], relations: ["joinedRooms"] },
+        { select: ["id", "username"], relations: ["joined_rooms"] },
       );
 
-      const userRooms = user.joinedRooms;
+      const userRooms = user.joined_rooms;
       
-      res.json(userRooms);
+      res.send(userRooms);
     } catch (error) {
-      res.status(400).json({ error });
+      res.status(400).send({error});
     }
   };
 }

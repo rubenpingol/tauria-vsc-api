@@ -8,19 +8,19 @@ const router = Router();
 router.post("/", [checkJWT], RoomController.createRoom);
 
 // list all rooms
-router.get("/", RoomController.getAll);
+router.get("/", RoomController.getRooms);
 
 // get room by guid
 router.get("/:guid", RoomController.getByGuid);
 
 // join room
-router.post("/join/:guid", [checkJWT], RoomController.joinRoom);
+router.post("/:guid/join", [checkJWT], RoomController.joinRoom);
 
 // leave room
-router.post("/leave/:guid", [checkJWT], RoomController.leaveRoom);
+router.post("/:guid/leave", [checkJWT], RoomController.leaveRoom);
 
 // change host
-router.post("/change-host/:guid", [checkJWT], RoomController.changeHost);
+router.post("/:guid/change-host", [checkJWT], RoomController.changeHost);
 
 // search room/s where a user is
 router.get("/user/:username", RoomController.searchUserRooms);

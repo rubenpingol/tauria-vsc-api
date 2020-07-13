@@ -6,18 +6,18 @@ import UserController from "../controllers/UserController";
 const router = Router();
 
 // get all users
-router.get("/", UserControler.listAll);
+router.get("/", UserControler.getUsers);
 
 // get one user by username
 router.get("/:username", UserController.getOneByUsername);
 
-// create a new user
+// creates a new user
 router.post("/", UserControler.newUser);
 
-// edit one user
-router.patch("/:id([0-9]+)", [checkJWT], UserControler.editUser);
+// update one user
+router.patch("/", [checkJWT], UserControler.updateUser);
 
 // delete user
-router.delete("/:id([0-9]+)", [checkJWT], UserController.deleteUser);
+router.delete("/", [checkJWT], UserController.deleteUser);
 
 export default router;

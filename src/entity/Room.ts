@@ -8,8 +8,8 @@ import {
   ManyToMany,
   JoinTable
 } from "typeorm";
-import { User } from "./User";
 import { Length } from "class-validator";
+import { User } from "./User";
 
 @Entity()
 export class Room {
@@ -29,7 +29,7 @@ export class Room {
   @JoinColumn({ name: "host" })
   host: User;
 
-  @ManyToMany(type => User, user => user.joinedRooms)
+  @ManyToMany(type => User, user => user.joined_rooms)
   @JoinTable()
   participants: User[];
 

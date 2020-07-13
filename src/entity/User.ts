@@ -8,7 +8,7 @@ import {
   OneToMany,
   ManyToMany
 } from "typeorm";
-import { Length, IsNotEmpty } from "class-validator";
+import { Length } from "class-validator";
 import * as bcrypt from "bcryptjs";
 import { Room } from "./Room";
 
@@ -27,24 +27,23 @@ export class User {
   @Length(4, 100)
   password: string;
 
-  @Column()
-  @IsNotEmpty()
-  role: string;
+  @Column({ nullable: true, length: 100 })
+  mobile_token: string;
 
   @Column()
   @CreateDateColumn()
-  createdAt: Date;
+  created_at: Date;
 
   @Column()
   @UpdateDateColumn()
-  updatedAt: Date;
+  updated_at: Date;
 
   // relations
   @OneToMany(type => Room, room => room.host)
-  hostedRooms: Room[];
+  hosted_rooms: Room[];
 
   @ManyToMany(type => Room, room => room.participants)
-  joinedRooms: Room[];
+  joined_rooms: Room[];
 
   hashPassword() {
     this.password = bcrypt.hashSync(this.password, 8);

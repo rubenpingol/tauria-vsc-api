@@ -20,12 +20,12 @@ class AuthControler {
     try {
       user = await userRepository.findOneOrFail({ where: { username } });
     } catch (error) {
-      res.status(401).send();
+      res.status(401).json({ error: {...error, message: "No account is associated with that username" } });
     }
 
     // check if encrypted password match
     if (!user.checkIfUnencryptedPasswordIsValid(password)) {
-      res.status(401).send();
+      res.status(401).json({ error: { name: "PasswordIncorrect", message: "Incorrect password" } });
       return;
     }
 
@@ -58,7 +58,7 @@ class AuthControler {
       res.status(401).send();
     }
 
-    // check if old password matches
+    // return false, if given old password don't match
     if (!user.checkIfUnencryptedPasswordIsValid(oldPassword)) {
       res.status(401).send();
       return;
